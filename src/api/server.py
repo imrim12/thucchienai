@@ -525,9 +525,11 @@ def create_app() -> Flask:
     return app
 
 
+# Create the app instance for imports
+app = create_app()
+
 if __name__ == "__main__":
     # For development purposes only
-    app = create_app()
     settings = get_settings()
     app.run(
         host=settings.flask_host,

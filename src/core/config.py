@@ -5,36 +5,40 @@ Handles environment variables and application settings.
 
 import os
 from typing import Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field
 
 
-class Settings(BaseSettings):
+class Settings:
     """Application settings loaded from environment variables."""
     
-    # Google AI API Configuration
-    google_api_key: str = Field(..., env="GOOGLE_API_KEY")
-    
-    # PostgreSQL Cache Database Configuration
-    postgres_uri: str = Field(..., env="POSTGRES_URI")
-    
-    # Target Database Configuration (for SQL execution)
-    target_db_uri: Optional[str] = Field(None, env="TARGET_DB_URI")
-    
-    # Vector similarity threshold for cache lookup
-    similarity_threshold: float = Field(0.8, env="SIMILARITY_THRESHOLD")
-    
-    # Database schema
-    db_schema: str = Field("public", env="DB_SCHEMA")
-    
-    # Flask configuration
-    flask_debug: bool = Field(False, env="FLASK_DEBUG")
-    flask_host: str = Field("0.0.0.0", env="FLASK_HOST")
-    flask_port: int = Field(5000, env="FLASK_PORT")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    def __init__(self):
+        # Load environment variables from .env file if it exists
+        if os.path.exists(".env"):
+            from dotenv import load_dotenv
+            load_dotenv()
+        
+        # Google AI API Configuration - support both old and new names
+        self.google_api_key = (
+            os.getenv("GOOGLE_API_KEY") or 
+            os.getenv("GEMINI_API_KEY") or
+            ""
+        )
+        
+        # ChromaDB Configuration
+        self.chroma_collection_name = os.getenv("CHROMA_COLLECTION_NAME", "sql_queries")
+        
+        # Target Database Configuration (for SQL execution)
+        self.target_db_uri = os.getenv("TARGET_DB_URI")
+        
+        # Vector similarity threshold for cache lookup
+        self.similarity_threshold = float(os.getenv("SIMILARITY_THRESHOLD", "0.8"))
+        
+        # Database schema
+        self.db_schema = os.getenv("DB_SCHEMA", "public")
+        
+        # Flask configuration
+        self.flask_debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+        self.flask_host = os.getenv("FLASK_HOST", "0.0.0.0")
+        self.flask_port = int(os.getenv("FLASK_PORT", "5000"))
 
 
 # Global settings instance

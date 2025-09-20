@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # Text-to-SQL API Service
+  text-to-sql-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: text-to-sql-api
+    ports:
+      - "5000:5000"
+    environment:
+      # Google AI API Configuration
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      
+      # ChromaDB Configuration
+      - CHROMA_COLLECTION_NAME=sql_queries
+      
+      # Target Database Configuration (using PostgreSQL test DB)
+      - TARGET_DB_URI=postgresql://postgres:postgres@postgres:5432/testdb
+      
+      # Vector similarity threshold
+      - SIMILARITY_THRESHOLD=0.8
+      
+      # Flask Configuration
+      - FLASK_DEBUG=true
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5000
+    volumes:
+      # Mount ChromaDB data directory for persistence
+      - chroma_data:/app/docker/chroma_data
+      # Mount source code for development (hot reload)
+      - .:/app
+      # Exclude node_modules and other build artifacts
+      - /app/__pycache__
+      - /app/.pytest_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - text-to-sql-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database (for target SQL execution testing)
+  postgres:
+    image: postgres:15-alpine
+    container_name: text-to-sql-postgres
+    environment:
+      - POSTGRES_DB=testdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db:/docker-entrypoint-initdb.d
+    networks:
+      - text-to-sql-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d testdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # pgAdmin (Optional - for database management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: text-to-sql-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - text-to-sql-network
+    restart: unless-stopped
+    profiles:
+      - pgadmin
+
+# Named volumes for data persistence
+volumes:
+  chroma_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./docker/chroma_data
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres_data
+  pgadmin_data:
+    driver: local
+
+# Custom network
+networks:
+  text-to-sql-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -9,7 +9,7 @@ from langchain.chains import create_sql_query_chain
 from langchain_community.utilities import SQLDatabase
 
 from src.llm.google import get_gemini_llm, get_gemini_embeddings
-from src.database.postgres_cache import PostgresCache
+from src.database.chroma_db import ChromaCache
 from src.core.config import get_settings
 from src.prompts import get_text_to_sql_prompt, get_user_prompt, get_explanation_prompt, get_validation_prompt
 
@@ -191,8 +191,11 @@ class TextToSQLService:
         self.embeddings = get_gemini_embeddings()
         
         # Initialize cache
-        self.cache = PostgresCache()
-        
+        self.cache = ChromaCache(
+            persist_directory="./docker/chroma_data",
+            collection_name=self.settings.chroma_collection_name
+        )
+
         # Initialize SQL validator
         self.validator = SQLValidator()
         
