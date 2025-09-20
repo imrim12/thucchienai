@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email</title>
+</head>
+
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f7; margin: 0; padding: 0;">
+
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f4f7;">
+    <tr>
+      <td align="center">
+        <table width="600" border="0" cellspacing="0" cellpadding="20"
+          style="max-width: 600px; background-color: #ffffff; margin-top: 40px; margin-bottom: 40px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+          <tr>
+            <td align="center" style="border-bottom: 1px solid #eeeeee;">
+              <h1 style="font-size: 24px; color: #333333;">Welcome to <%= appName %>!</h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 30px 20px;">
+              <p style="font-size: 16px; color: #555555; line-height: 1.5;">
+                Dear customer,
+              </p>
+              <p style="font-size: 16px; color: #555555; line-height: 1.5;">
+                Thanks for signing up! There's just one final step. Please click the button below to verify your email
+                address and activate your account.
+              </p>
+
+              <table border="0" cellspacing="0" cellpadding="0" width="100%">
+                <tr>
+                  <td align="center" style="padding: 20px 0;">
+                    <a href="<%= verificationLink %>" target="_blank"
+                      style="background-color: #28a745; color: #ffffff; padding: 15px 25px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 16px;">
+                      Verify Email Address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size: 16px; color: #555555; line-height: 1.5;">
+                If you did not sign up for an account with <%= appName %>, you can safely disregard this email.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="border-top: 1px solid #eeeeee; padding: 20px; font-size: 12px; color: #999999;">
+              &copy; <%= new Date().getFullYear() %>
+                <%= appName %>. All rights reserved.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+
+</html>

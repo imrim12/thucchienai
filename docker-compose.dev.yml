@@ -1,85 +1,22 @@
+version: '3.8'
+
 services:
-  # Text-to-SQL API Service
-  text-to-sql-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: text-to-sql-api
-    ports:
-      - "5000:5000"
-    volumes:
-      # Mount source code for development with hot-reloading.
-      - .:/app
-    env_file:
-      - .env
-    depends_on:
-      - postgres
-      - chromadb
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # ChromaDB Vector Database
-  chromadb:
-    image: chromadb/chroma:latest
-    container_name: text-to-sql-chromadb
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./docker/persistent/chroma_data:/chroma
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # ChromaDB Admin UI (Optional)
-  # To run this service, use: docker-compose --profile chromadb-admin up
-  chromadb-admin:
-    image: fengzhichao/chromadb-admin:latest
-    container_name: text-to-sql-chromadb-admin
-    environment:
-      - CHROMA_SERVER_HOST=chromadb
-      - CHROMA_SERVER_HTTP_PORT=8000
-    ports:
-      - "8081:80"
-    depends_on:
-      chromadb:
-        condition: service_healthy
-    restart: unless-stopped
-    profiles:
-      - chromadb-admin
-
-  # PostgreSQL Database
-  postgres:
+  postgresql:
     image: postgres:17.5-alpine
-    container_name: text-to-sql-postgres
-    env_file:
-      - .env
+    container_name: postgres_db
+    restart: unless-stopped
     environment:
-      - POSTGRES_DB=applydb
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
-      - ./docker/persistent/postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-data:/var/lib/postgresql/data
       - ./docker/init-db:/docker-entrypoint-initdb.d
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d applydb"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    networks:
+      - dev-network
 
-  # Database Restoration Service
   db-restore:
     image: postgres:17.5-alpine
     container_name: text-to-sql-db-restore
@@ -93,20 +30,39 @@ services:
     command: ["/bin/sh", "/app/scripts/restore-database.sh"]
     restart: "no"
 
-  # pgAdmin (Optional - for database management)
-  # To run this service, use: docker-compose --profile pgadmin up
   pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: text-to-sql-pgadmin
+    image: dpage/pgadmin4:9.8
+    container_name: pgadmin_gui
+    restart: unless-stopped
     environment:
       - PGADMIN_DEFAULT_EMAIL=admin@example.com
-      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_DEFAULT_PASSWORD=password
     ports:
-      - "8080:80"
-    volumes:
-      - ./docker/persistent/pgadmin_data:/var/lib/pgadmin
+      - '5050:80'
     depends_on:
-      - postgres
+      - postgresql
+    networks:
+      - dev-network
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis_cache
     restart: unless-stopped
-    profiles:
-      - pgadmin
+    ports:
+      - '6379:6379'
+    networks:
+      - dev-network
+
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog_server
+    restart: unless-stopped
+    ports:
+      - '1025:1025' # SMTP server
+      - '8025:8025' # Web UI
+    networks:
+      - dev-network
+
+networks:
+  dev-network:
+    driver: bridge
