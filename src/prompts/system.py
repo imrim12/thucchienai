@@ -41,13 +41,14 @@ Always ensure your SQL is:
 - Safe for read-only access
 """
 
+
 def get_text_to_sql_prompt(readonly: bool = False) -> str:
     """
     Get the appropriate system prompt based on readonly mode.
-    
+
     Args:
         readonly: If True, returns readonly prompt restricting to SELECT only
-        
+
     Returns:
         System prompt string
     """

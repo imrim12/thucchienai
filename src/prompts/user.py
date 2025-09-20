@@ -31,22 +31,24 @@ Database Schema Information:
 Generate a clean, well-formatted SQL query that works with the provided schema.
 Only return the SQL query without explanations."""
 
-def get_user_prompt(question: str, readonly: bool = False, schema_info: str = None) -> str:
+
+def get_user_prompt(
+    question: str, readonly: bool = False, schema_info: str = None
+) -> str:
     """
     Generate user prompt for text-to-SQL conversion.
-    
+
     Args:
         question: Natural language question
         readonly: If True, emphasizes SELECT-only restrictions
         schema_info: Optional database schema information
-        
+
     Returns:
         Formatted user prompt string
     """
     if schema_info:
         return DATABASE_AWARE_TEXT_TO_SQL_USER_PROMPT.format(
-            question=question, 
-            schema_info=schema_info
+            question=question, schema_info=schema_info
         )
     elif readonly:
         return READONLY_TEXT_TO_SQL_USER_PROMPT.format(question=question)

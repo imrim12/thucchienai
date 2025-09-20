@@ -33,13 +33,16 @@ Provide:
 
 Format as clean SQL statements."""
 
+
 def get_explanation_prompt(sql_query: str) -> str:
     """Generate prompt for explaining SQL queries."""
     return SQL_EXPLANATION_PROMPT.format(sql_query=sql_query)
 
+
 def get_similar_questions_prompt(sql_query: str) -> str:
     """Generate prompt for suggesting similar questions."""
     return SIMILAR_QUESTIONS_PROMPT.format(sql_query=sql_query)
+
 
 def get_test_data_prompt(sql_query: str) -> str:
     """Generate prompt for creating test data."""

@@ -1,15 +1,15 @@
 """
 Database initialization and session management for SQLAlchemy.
 
-This module handles the SQLAlchemy engine, session factory, and 
+This module handles the SQLAlchemy engine, session factory, and
 database connection management for the vectorization metadata system.
 """
 
 from contextlib import contextmanager
-from typing import Generator, Optional, Any, Dict
+from typing import Any, Dict, Generator, Optional
 
-from sqlalchemy import create_engine, Engine, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.core.config import get_settings
@@ -20,13 +20,13 @@ class DatabaseManager:
     """
     Manages SQLAlchemy database connections and sessions.
     """
-    
+
     def __init__(self):
         self.settings = get_settings()
         self.engine: Optional[Engine] = None
         self.SessionLocal: Optional[sessionmaker] = None
         self._initialize_database()
-    
+
     def _initialize_database(self):
         """Initialize the database engine and session factory."""
         # Create engine with appropriate settings
@@ -34,56 +34,54 @@ class DatabaseManager:
             "echo": self.settings.SQLALCHEMY_ECHO,
             "pool_pre_ping": True,  # Verify connections before use
         }
-        
+
         # Special handling for SQLite
         if self.settings.METADATA_DATABASE_URL.startswith("sqlite"):
-            engine_kwargs.update({
-                "poolclass": StaticPool,
-                "connect_args": {
-                    "check_same_thread": False,
-                    "timeout": 20
+            engine_kwargs.update(
+                {
+                    "poolclass": StaticPool,
+                    "connect_args": {"check_same_thread": False, "timeout": 20},
                 }
-            })
+            )
         else:
             # For PostgreSQL, MySQL, etc.
-            engine_kwargs.update({
-                "pool_size": 5,
-                "max_overflow": 10,
-                "pool_timeout": 30,
-                "pool_recycle": 3600,  # Recycle connections every hour
-            })
-        
+            engine_kwargs.update(
+                {
+                    "pool_size": 5,
+                    "max_overflow": 10,
+                    "pool_timeout": 30,
+                    "pool_recycle": 3600,  # Recycle connections every hour
+                }
+            )
+
         self.engine = create_engine(
-            self.settings.METADATA_DATABASE_URL,
-            **engine_kwargs
+            self.settings.METADATA_DATABASE_URL, **engine_kwargs
         )
-        
+
         # Create session factory
         self.SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=self.engine
+            autocommit=False, autoflush=False, bind=self.engine
         )
-    
+
     def create_tables(self):
         """Create all tables defined in models."""
         Base.metadata.create_all(bind=self.engine)
-    
+
     def drop_tables(self):
         """Drop all tables (use with caution!)."""
         Base.metadata.drop_all(bind=self.engine)
-    
+
     def get_session(self) -> Session:
         """Get a new database session."""
         if self.SessionLocal is None:
             raise RuntimeError("Database not initialized")
         return self.SessionLocal()
-    
+
     @contextmanager
     def session_scope(self) -> Generator[Session, None, None]:
         """
         Provide a transactional scope around a series of operations.
-        
+
         Usage:
             with db_manager.session_scope() as session:
                 # Your database operations here
@@ -100,7 +98,7 @@ class DatabaseManager:
             raise
         finally:
             session.close()
-    
+
     def test_connection(self) -> bool:
         """Test the database connection."""
         try:
@@ -112,7 +110,7 @@ class DatabaseManager:
         except Exception as e:
             print(f"Database connection failed: {e}")
             return False
-    
+
     def close(self):
         """Close the database engine."""
         if self.engine:
@@ -137,7 +135,7 @@ def get_db_session() -> Session:
 def get_db_session_context() -> Generator[Session, None, None]:
     """
     Get a database session with automatic cleanup.
-    
+
     Usage:
         with get_db_session_context() as session:
             # Your database operations here
@@ -166,15 +164,16 @@ def test_database_connection() -> bool:
 
 # Database utilities for common operations
 
+
 def get_or_create(session: Session, model, **kwargs):
     """
     Get an existing instance or create a new one.
-    
+
     Args:
         session: Database session
         model: SQLAlchemy model class
         **kwargs: Fields to match/create with
-        
+
     Returns:
         tuple: (instance, created_bool)
     """
@@ -191,11 +190,11 @@ def get_or_create(session: Session, model, **kwargs):
 def safe_delete(session: Session, instance):
     """
     Safely delete an instance with error handling.
-    
+
     Args:
         session: Database session
         instance: SQLAlchemy model instance to delete
-        
+
     Returns:
         bool: True if deleted successfully, False otherwise
     """
@@ -212,12 +211,12 @@ def safe_delete(session: Session, instance):
 def bulk_insert(session: Session, model, data_list: list):
     """
     Efficiently insert multiple records.
-    
+
     Args:
         session: Database session
         model: SQLAlchemy model class
         data_list: List of dictionaries with model data
-        
+
     Returns:
         int: Number of records inserted
     """

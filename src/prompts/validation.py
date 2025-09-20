@@ -37,14 +37,15 @@ Instructions:
 
 If the query violates readonly restrictions, return an empty response."""
 
+
 def get_validation_prompt(sql_query: str, readonly: bool = False) -> str:
     """
     Generate validation prompt for SQL query verification.
-    
+
     Args:
         sql_query: SQL query to validate
         readonly: If True, applies readonly restrictions
-        
+
     Returns:
         Formatted validation prompt string
     """
