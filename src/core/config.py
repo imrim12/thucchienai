@@ -26,6 +26,9 @@ class Settings:
         # ChromaDB Configuration
         self.chroma_collection_name = os.getenv("CHROMA_COLLECTION_NAME", "sql_queries")
         
+        # PostgreSQL Cache Database Configuration (for query caching)
+        self.cache_db_uri = os.getenv("CACHE_DB_URI")
+        
         # Target Database Configuration (for SQL execution)
         self.target_db_uri = os.getenv("TARGET_DB_URI")
         
@@ -39,6 +42,20 @@ class Settings:
         self.flask_debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
         self.flask_host = os.getenv("FLASK_HOST", "0.0.0.0")
         self.flask_port = int(os.getenv("FLASK_PORT", "5000"))
+        
+        # CSRF Protection
+        self.csrf_secret = os.getenv("CSRF_SECRET", "")
+        if not self.csrf_secret:
+            print("WARNING: CSRF_SECRET not set. CSRF protection will be disabled.")
+        
+        # CORS Configuration
+        self.cors_origins = [
+            origin.strip() 
+            for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+            if origin.strip()
+        ]
+        self.cors_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        self.cors_headers = ["Content-Type", "Authorization", "X-CSRFToken"]
 
 
 # Global settings instance

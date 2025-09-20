@@ -1,22 +1,105 @@
 """
-Flask API server for the Text-to-SQL service.
+Flask API server for the Text-to-SQL service with CSRF protection and CORS security.
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
-from typing import Dict, Any
+from flask_wtf.csrf import CSRFProtect, generate_csrf, validate_csrf
+from werkzeug.exceptions import BadRequest
+from typing import Dict, Any, Optional
 import traceback
+import secrets
+import hashlib
+import hmac
+import time
 
 from src.agents.text_to_sql import TextToSQLService
 from src.core.config import get_settings
 
 
+class CSRFValidator:
+    """Custom CSRF token validator."""
+    
+    def __init__(self, secret_key: str):
+        self.secret_key = secret_key.encode() if isinstance(secret_key, str) else secret_key
+    
+    def generate_token(self, session_id: Optional[str] = None) -> str:
+        """Generate a CSRF token."""
+        if not session_id:
+            session_id = secrets.token_urlsafe(32)
+        
+        timestamp = str(int(time.time()))
+        message = f"{session_id}:{timestamp}"
+        signature = hmac.new(
+            self.secret_key, 
+            message.encode(), 
+            hashlib.sha256
+        ).hexdigest()
+        
+        return f"{session_id}:{timestamp}:{signature}"
+    
+    def validate_token(self, token: str, max_age: int = 3600) -> bool:
+        """Validate a CSRF token."""
+        try:
+            parts = token.split(':')
+            if len(parts) != 3:
+                return False
+            
+            session_id, timestamp, signature = parts
+            
+            # Check timestamp
+            token_time = int(timestamp)
+            if time.time() - token_time > max_age:
+                return False
+            
+            # Verify signature
+            message = f"{session_id}:{timestamp}"
+            expected_signature = hmac.new(
+                self.secret_key, 
+                message.encode(), 
+                hashlib.sha256
+            ).hexdigest()
+            
+            return hmac.compare_digest(signature, expected_signature)
+            
+        except (ValueError, TypeError):
+            return False
+
+
 def create_app() -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__)
+    settings = get_settings()
     
-    # Enable CORS for all routes
-    CORS(app)
+    # Configure Flask secret key for sessions
+    app.secret_key = settings.csrf_secret or secrets.token_urlsafe(32)
+    
+    # Configure CORS with restricted origins and headers
+    CORS(app, 
+         origins=settings.cors_origins,
+         methods=settings.cors_methods,
+         allow_headers=settings.cors_headers,
+         supports_credentials=True)
+    
+    # Initialize CSRF protection if secret is provided
+    csrf_validator = None
+    if settings.csrf_secret:
+        csrf_validator = CSRFValidator(settings.csrf_secret)
+        print("CSRF protection enabled")
+    else:
+        print("WARNING: CSRF protection disabled - set CSRF_SECRET environment variable")
+    
+    def validate_csrf_token():
+        """Validate CSRF token for POST requests."""
+        if not csrf_validator:
+            return True  # Skip validation if CSRF is not configured
+        
+        if request.method in ['POST', 'PUT', 'DELETE']:
+            csrf_token = request.headers.get('X-CSRFToken') or request.form.get('csrf_token')
+            if not csrf_token:
+                return False
+            return csrf_validator.validate_token(csrf_token)
+        return True
     
     # Initialize the Text-to-SQL service
     try:
@@ -25,6 +108,19 @@ def create_app() -> Flask:
     except Exception as e:
         print(f"Failed to initialize Text-to-SQL service: {e}")
         text_to_sql_service = None
+    
+    @app.route('/api/csrf-token', methods=['GET'])
+    def get_csrf_token():
+        """Get CSRF token for client-side requests."""
+        if not csrf_validator:
+            return jsonify({
+                "error": "CSRF protection not configured"
+            }), 503
+        
+        token = csrf_validator.generate_token()
+        return jsonify({
+            "csrf_token": token
+        }), 200
     
     @app.route('/health', methods=['GET'])
     def health_check():
@@ -39,7 +135,8 @@ def create_app() -> Flask:
             health_status = text_to_sql_service.health_check()
             return jsonify({
                 "status": "healthy",
-                "components": health_status
+                "components": health_status,
+                "csrf_enabled": csrf_validator is not None
             }), 200
         except Exception as e:
             return jsonify({
@@ -58,6 +155,9 @@ def create_app() -> Flask:
             "readonly": false  // optional, defaults to false
         }
         
+        Headers:
+        X-CSRFToken: <csrf_token>  // required if CSRF is enabled
+        
         Returns:
         {
             "sql_query": "generated SQL query" or "",
@@ -68,6 +168,12 @@ def create_app() -> Flask:
             "is_valid": boolean
         }
         """
+        # Validate CSRF token
+        if not validate_csrf_token():
+            return jsonify({
+                "error": "Invalid or missing CSRF token"
+            }), 403
+        
         if text_to_sql_service is None:
             return jsonify({
                 "error": "Service not initialized"
@@ -124,6 +230,9 @@ def create_app() -> Flask:
             "sql_query": "SELECT * FROM table_name"
         }
         
+        Headers:
+        X-CSRFToken: <csrf_token>  // required if CSRF is enabled
+        
         Returns:
         {
             "success": boolean,
@@ -132,6 +241,12 @@ def create_app() -> Flask:
             "query": the executed query
         }
         """
+        # Validate CSRF token
+        if not validate_csrf_token():
+            return jsonify({
+                "error": "Invalid or missing CSRF token"
+            }), 403
+        
         if text_to_sql_service is None:
             return jsonify({
                 "error": "Service not initialized"
@@ -185,6 +300,9 @@ def create_app() -> Flask:
             "readonly": false  // optional, defaults to false
         }
         
+        Headers:
+        X-CSRFToken: <csrf_token>  // required if CSRF is enabled
+        
         Returns:
         {
             "sql_query": "generated SQL query",
@@ -195,6 +313,12 @@ def create_app() -> Flask:
             "is_valid": boolean
         }
         """
+        # Validate CSRF token
+        if not validate_csrf_token():
+            return jsonify({
+                "error": "Invalid or missing CSRF token"
+            }), 403
+        
         if text_to_sql_service is None:
             return jsonify({
                 "error": "Service not initialized"
@@ -279,11 +403,20 @@ def create_app() -> Flask:
             "sql_query": "SELECT * FROM users WHERE age > 25"
         }
         
+        Headers:
+        X-CSRFToken: <csrf_token>  // required if CSRF is enabled
+        
         Returns:
         {
             "explanation": "This query retrieves all columns from the users table..."
         }
         """
+        # Validate CSRF token
+        if not validate_csrf_token():
+            return jsonify({
+                "error": "Invalid or missing CSRF token"
+            }), 403
+        
         if text_to_sql_service is None:
             return jsonify({
                 "error": "Service not initialized"
@@ -336,6 +469,9 @@ def create_app() -> Flask:
             "readonly": true  // optional, defaults to false
         }
         
+        Headers:
+        X-CSRFToken: <csrf_token>  // required if CSRF is enabled
+        
         Returns:
         {
             "is_valid": boolean,
@@ -343,6 +479,12 @@ def create_app() -> Flask:
             "explanation": "explanation of validation result"
         }
         """
+        # Validate CSRF token
+        if not validate_csrf_token():
+            return jsonify({
+                "error": "Invalid or missing CSRF token"
+            }), 403
+        
         if text_to_sql_service is None:
             return jsonify({
                 "error": "Service not initialized"
@@ -396,9 +538,12 @@ def create_app() -> Flask:
         
         Expected JSON payload:
         {
-            "sql_query": "SELECT * FROM users",
-            "readonly": true  // optional, defaults to false
+            "sql_query": "SELECT * FROM users; DROP TABLE users;",
+            "readonly": true
         }
+        
+        Headers:
+        X-CSRFToken: <csrf_token>  // required if CSRF is enabled
         
         Returns:
         {
@@ -408,6 +553,12 @@ def create_app() -> Flask:
             "passed_readonly_check": boolean
         }
         """
+        # Validate CSRF token
+        if not validate_csrf_token():
+            return jsonify({
+                "error": "Invalid or missing CSRF token"
+            }), 403
+        
         if text_to_sql_service is None:
             return jsonify({
                 "error": "Service not initialized"
@@ -483,6 +634,12 @@ def create_app() -> Flask:
     @app.route('/api/cache/clear', methods=['POST'])
     def clear_cache():
         """Clear the cache."""
+        # Validate CSRF token
+        if not validate_csrf_token():
+            return jsonify({
+                "error": "Invalid or missing CSRF token"
+            }), 403
+        
         if text_to_sql_service is None:
             return jsonify({
                 "error": "Service not initialized"

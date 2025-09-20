@@ -11,6 +11,8 @@ A web service that converts natural language questions into SQL queries using Go
 - 📊 **Query Execution**: Optional SQL execution against target databases
 - 🛡️ **SQL Validation**: Built-in SQL syntax validation and security checks
 - 🔒 **Readonly Mode**: Restricts output to SELECT-only queries for security
+- 🛡️ **CSRF Protection**: Cross-Site Request Forgery protection for all POST endpoints
+- 🌐 **CORS Security**: Configurable CORS with restricted origins and headers
 - 🏥 **Health Monitoring**: Built-in health checks and cache statistics
 
 ## API Endpoints
@@ -110,6 +112,37 @@ Clear the cache.
 ### GET /health
 Service health check.
 
+## 🔐 Authentication & Security
+
+### CSRF Protection
+All POST endpoints require CSRF token validation when enabled. To use protected endpoints:
+
+1. **Get CSRF Token:**
+```bash
+curl -X GET http://localhost:5000/api/csrf-token
+```
+
+Response:
+```json
+{
+  "csrf_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+2. **Include Token in POST Requests:**
+```bash
+curl -X POST http://localhost:5000/api/text-to-sql \
+  -H "Content-Type: application/json" \
+  -H "X-CSRFToken: YOUR_CSRF_TOKEN_HERE" \
+  -d '{"question": "Show me all users"}'
+```
+
+### CORS Configuration
+CORS is configured with restricted origins and headers for security:
+- **Allowed Origins**: Configurable via `CORS_ORIGINS` environment variable
+- **Allowed Headers**: `Content-Type`, `X-CSRFToken`
+- **Credentials**: Supported for cookie-based authentication
+
 ## SQL Validation Features
 
 ### 🛡️ **Security Features**
@@ -131,7 +164,11 @@ Set the following environment variables in `.env`:
 ```env
 # Required
 GOOGLE_API_KEY=your_google_api_key_here
-POSTGRES_URI=postgresql://username:password@localhost:5432/cache_db
+CACHE_DB_URI=postgresql://username:password@localhost:5432/cache_db
+
+# Security (Required for production)
+CSRF_SECRET=your_csrf_secret_key_here
+CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
 
 # Optional
 TARGET_DB_URI=postgresql://username:password@localhost:5432/target_db

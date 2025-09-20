@@ -24,7 +24,7 @@ class PostgresCache:
     def connect(self) -> None:
         """Establish connection to PostgreSQL database."""
         try:
-            self.connection = psycopg2.connect(self.settings.postgres_uri)
+            self.connection = psycopg2.connect(self.settings.cache_db_uri)
             self.connection.autocommit = True
             print("Successfully connected to PostgreSQL cache database")
         except Exception as e:

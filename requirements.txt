@@ -1,6 +1,7 @@
 # Web Framework
 flask==3.0.0
 flask-cors==4.0.0
+flask-wtf==1.1.1
 
 # LangChain and LLM - Using versions that work with numpy 2.x
 langchain>=0.3.0
