@@ -19,28 +19,48 @@ logger = logging.getLogger(__name__)
 class ChromaCache:
     """ChromaDB-based cache for storing and retrieving text-to-SQL queries with vector similarity."""
     
-    def __init__(self, persist_directory: str = "./chroma_data", collection_name: str = "sql_queries"):
+    def __init__(self, host: str = "localhost", port: int = 8000, persist_directory: str = "./chroma_data", collection_name: str = "sql_queries"):
         """
         Initialize ChromaDB cache.
         
         Args:
-            persist_directory: Directory to persist ChromaDB data
+            host: ChromaDB server host (for HTTP client)
+            port: ChromaDB server port (for HTTP client)
+            persist_directory: Directory to persist ChromaDB data (for local client)
             collection_name: Name of the collection to store queries
         """
-        self.persist_directory = persist_directory
         self.collection_name = collection_name
         
-        # Ensure the persist directory exists
-        os.makedirs(persist_directory, exist_ok=True)
-        
-        # Initialize ChromaDB client with persistence
-        self.client: Optional[ClientAPI] = chromadb.PersistentClient(
-            path=persist_directory,
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=True
+        # Try to connect to ChromaDB server first, fallback to local persistent client
+        try:
+            # Try HTTP client first (for Docker/server deployment)
+            self.client: Optional[ClientAPI] = chromadb.HttpClient(
+                host=host,
+                port=port,
+                settings=Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True
+                )
             )
-        )
+            # Test connection
+            self.client.heartbeat()
+            print(f"Connected to ChromaDB server at {host}:{port}")
+        except Exception as e:
+            print(f"Failed to connect to ChromaDB server at {host}:{port}: {e}")
+            print("Falling back to local persistent client...")
+            
+            # Fallback to persistent client (for local development)
+            self.persist_directory = persist_directory
+            os.makedirs(persist_directory, exist_ok=True)
+            
+            self.client = chromadb.PersistentClient(
+                path=persist_directory,
+                settings=Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True
+                )
+            )
+            print(f"Using local ChromaDB at {persist_directory}")
         
         # Get or create collection
         try:

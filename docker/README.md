@@ -38,7 +38,7 @@ This directory contains Docker configuration for the Text-to-SQL service develop
 ### postgres
 - **Port:** 5432
 - **Description:** PostgreSQL database with sample data for testing SQL queries
-- **Database:** testdb
+- **Database:** applydb
 - **Username:** postgres
 - **Password:** postgres
 
@@ -90,14 +90,14 @@ The application code is mounted as a volume for hot reloading during development
 
 **Via psql:**
 ```bash
-docker exec -it text-to-sql-postgres psql -U postgres -d testdb
+docker exec -it text-to-sql-postgres psql -U postgres -d applydb
 ```
 
 **Via pgAdmin:**
 1. Start with pgAdmin profile: `docker-compose -f docker-compose.dev.yml --profile pgadmin up -d`
 2. Open http://localhost:8080
 3. Login with admin@example.com / admin
-4. Add server with host: postgres, port: 5432, database: testdb, username: postgres, password: postgres
+4. Add server with host: postgres, port: 5432, database: applydb, username: postgres, password: postgres
 
 ## Sample Data
 

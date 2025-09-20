@@ -22,6 +22,9 @@ from src.database.models import (
 from src.database.database import get_db_session_context
 from src.database.chroma_db import ChromaCache
 from src.llm.google import get_gemini_embeddings
+from src.core.config import get_settings
+
+settings = get_settings()
 
 
 logger = logging.getLogger(__name__)
@@ -34,7 +37,12 @@ class VectorizationService:
     
     def __init__(self):
         self.embedding_model = get_gemini_embeddings()
-        self.chroma_cache = ChromaCache()
+        self.chroma_cache = ChromaCache(
+            host=settings.CHROMA_HOST,
+            port=settings.CHROMA_PORT,
+            persist_directory=settings.CHROMA_PERSIST_DIRECTORY,
+            collection_name=settings.CHROMA_COLLECTION_NAME
+        )
         self.batch_size = 50  # Number of records to process at once
         self.max_text_length = 8000  # Maximum text length for embedding
     
@@ -513,7 +521,7 @@ class VectorizationService:
         query: str, 
         collection_name: Optional[str] = None,
         top_k: int = 5,
-        similarity_threshold: float = 0.7
+        SIMILARITY_THRESHOLD: float = 0.7
     ) -> List[Dict[str, Any]]:
         """
         Search vectorized content using similarity search.
@@ -522,7 +530,7 @@ class VectorizationService:
             query: Search query
             collection_name: Optional specific collection to search
             top_k: Number of results to return
-            similarity_threshold: Minimum similarity score
+            SIMILARITY_THRESHOLD: Minimum similarity score
             
         Returns:
             List of search results
@@ -567,7 +575,7 @@ class VectorizationService:
                             
                             for i, (doc, metadata, distance) in enumerate(zip(documents, metadatas, distances)):
                                 similarity = 1 - distance  # Convert distance to similarity
-                                if similarity >= similarity_threshold:
+                                if similarity >= SIMILARITY_THRESHOLD:
                                     all_results.append({
                                         'content': doc,
                                 'metadata': metadata,

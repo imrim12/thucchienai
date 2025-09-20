@@ -27,7 +27,7 @@ def get_gemini_llm(
     
     return ChatGoogleGenerativeAI(
         model=model_name,
-        google_api_key=settings.google_api_key,
+        GOOGLE_API_KEY=settings.GOOGLE_API_KEY,
         temperature=temperature,
         max_output_tokens=max_output_tokens
     )
@@ -49,5 +49,5 @@ def get_gemini_embeddings(
     
     return GoogleGenerativeAIEmbeddings(
         model=model_name,
-        google_api_key=settings.google_api_key
+        GOOGLE_API_KEY=settings.GOOGLE_API_KEY
     )

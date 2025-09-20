@@ -31,12 +31,12 @@ class DatabaseManager:
         """Initialize the database engine and session factory."""
         # Create engine with appropriate settings
         engine_kwargs: Dict[str, Any] = {
-            "echo": self.settings.sqlalchemy_echo,
+            "echo": self.settings.SQLALCHEMY_ECHO,
             "pool_pre_ping": True,  # Verify connections before use
         }
         
         # Special handling for SQLite
-        if self.settings.sqlalchemy_database_url.startswith("sqlite"):
+        if self.settings.METADATA_DATABASE_URL.startswith("sqlite"):
             engine_kwargs.update({
                 "poolclass": StaticPool,
                 "connect_args": {
@@ -54,7 +54,7 @@ class DatabaseManager:
             })
         
         self.engine = create_engine(
-            self.settings.sqlalchemy_database_url,
+            self.settings.METADATA_DATABASE_URL,
             **engine_kwargs
         )
         

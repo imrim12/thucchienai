@@ -1,6 +1,11 @@
 """
 Configuration management for the Text-to-SQL service.
 Handles environment variables and application settings.
+
+Database Architecture:
+- METADATA_DATABASE_URL: Stores application metadata (vectorization jobs, table configs, etc.)
+- TARGET_DB_URI: The database we generate SQL queries against 
+- ChromaDB: Vector storage for query caching and similarity search
 """
 
 import os
@@ -17,52 +22,52 @@ class Settings:
             load_dotenv()
         
         # Google AI API Configuration - support both old and new names
-        self.google_api_key = (
+        self.GOOGLE_API_KEY = (
             os.getenv("GOOGLE_API_KEY") or 
             os.getenv("GEMINI_API_KEY") or
             ""
         )
         
         # ChromaDB Configuration
-        self.chroma_collection_name = os.getenv("CHROMA_COLLECTION_NAME", "sql_queries")
+        self.CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+        self.CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
+        self.CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "sql_queries")
+        self.CHROMA_PERSIST_DIRECTORY = os.getenv("CHROMA_PERSIST_DIRECTORY", "./chroma_data")
         
-        # PostgreSQL Cache Database Configuration (for query caching)
-        self.cache_db_uri = os.getenv("CACHE_DB_URI")
-
-        # SQLAlchemy Configuration
-        self.sqlalchemy_database_url = os.getenv(
-            "SQLALCHEMY_DATABASE_URL", 
+        # Metadata Database Configuration (for storing vectorization jobs, table configs, etc.)
+        self.METADATA_DATABASE_URL = os.getenv(
+            "METADATA_DATABASE_URL", 
             "postgresql://user:password@localhost:5432/text_to_sql_metadata"
         )
-        self.sqlalchemy_echo = os.getenv("SQLALCHEMY_ECHO", "false").lower() == "true"
+        self.SQLALCHEMY_ECHO = os.getenv("SQLALCHEMY_ECHO", "false").lower() == "true"
 
-        # Target Database Configuration (for SQL execution)
-        self.target_db_uri = os.getenv("TARGET_DB_URI")
+        # Target Database Configuration (the database we generate SQL queries against)
+        self.TARGET_DB_URI = os.getenv("TARGET_DB_URI")
         
         # Vector similarity threshold for cache lookup
-        self.similarity_threshold = float(os.getenv("SIMILARITY_THRESHOLD", "0.8"))
+        self.SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.8"))
         
         # Database schema
-        self.db_schema = os.getenv("DB_SCHEMA", "public")
+        self.DB_SCHEMA = os.getenv("DB_SCHEMA", "public")
         
         # Flask configuration
-        self.flask_debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
-        self.flask_host = os.getenv("FLASK_HOST", "0.0.0.0")
-        self.flask_port = int(os.getenv("FLASK_PORT", "5000"))
+        self.FLASK_DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+        self.FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
+        self.FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
         
         # CSRF Protection
-        self.csrf_secret = os.getenv("CSRF_SECRET", "")
-        if not self.csrf_secret:
+        self.CSRF_SECRET = os.getenv("CSRF_SECRET", "")
+        if not self.CSRF_SECRET:
             print("WARNING: CSRF_SECRET not set. CSRF protection will be disabled.")
         
         # CORS Configuration
-        self.cors_origins = [
+        self.CORS_ORIGINS = [
             origin.strip() 
             for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
             if origin.strip()
         ]
-        self.cors_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-        self.cors_headers = ["Content-Type", "Authorization", "X-CSRFToken"]
+        self.CORS_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        self.CORS_HEADERS = ["Content-Type", "Authorization", "X-CSRFToken"]
 
 
 # Global settings instance

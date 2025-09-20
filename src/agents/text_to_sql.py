@@ -68,7 +68,7 @@ class SQLValidator:
             List of parsed SQL statements
         """
         try:
-            return sqlparse.parse(sql)
+            return list(sqlparse.parse(sql))
         except Exception:
             return []
     
@@ -192,8 +192,10 @@ class TextToSQLService:
         
         # Initialize cache
         self.cache = ChromaCache(
-            persist_directory="./docker/chroma_data",
-            collection_name=self.settings.chroma_collection_name
+            host=self.settings.CHROMA_HOST,
+            port=self.settings.CHROMA_PORT,
+            persist_directory=self.settings.CHROMA_PERSIST_DIRECTORY,
+            collection_name=self.settings.CHROMA_COLLECTION_NAME
         )
 
         # Initialize SQL validator
@@ -201,9 +203,9 @@ class TextToSQLService:
         
         # Initialize target database connection (if provided)
         self.target_db = None
-        if self.settings.target_db_uri:
+        if self.settings.TARGET_DB_URI:
             try:
-                self.target_db = SQLDatabase.from_uri(self.settings.target_db_uri)
+                self.target_db = SQLDatabase.from_uri(self.settings.TARGET_DB_URI)
                 print("Connected to target database for SQL execution")
             except Exception as e:
                 print(f"Warning: Could not connect to target database: {e}")
@@ -250,7 +252,11 @@ class TextToSQLService:
                 full_prompt = f"{system_prompt}\n\n{user_prompt}"
                 
                 response = self.llm.invoke(full_prompt)
-                raw_sql = response.content.strip()
+                # Handle both string and list responses from LLM
+                if isinstance(response.content, list):
+                    raw_sql = str(response.content[0]).strip() if response.content else ""
+                else:
+                    raw_sql = str(response.content).strip()
                 
             else:
                 # Use LangChain's SQL chain with the target database
@@ -301,7 +307,7 @@ class TextToSQLService:
             # Step 2: Check cache for similar questions
             similar_result = self.cache.find_similar_question(
                 question_vector, 
-                self.settings.similarity_threshold
+                self.settings.SIMILARITY_THRESHOLD
             )
             
             # Step 3: Return cached result if found (but validate for readonly mode)
@@ -412,7 +418,11 @@ class TextToSQLService:
             
             prompt = get_explanation_prompt(sql_query)
             response = self.llm.invoke(prompt)
-            return response.content.strip()
+            # Handle both string and list responses from LLM
+            if isinstance(response.content, list):
+                return str(response.content[0]).strip() if response.content else "No explanation available."
+            else:
+                return str(response.content).strip()
             
         except Exception as e:
             print(f"Error explaining SQL query: {e}")
@@ -450,7 +460,11 @@ class TextToSQLService:
             # If local validation fails, try LLM validation
             prompt = get_validation_prompt(sql_query, readonly)
             response = self.llm.invoke(prompt)
-            corrected_sql = response.content.strip()
+            # Handle both string and list responses from LLM
+            if isinstance(response.content, list):
+                corrected_sql = str(response.content[0]).strip() if response.content else sql_query
+            else:
+                corrected_sql = str(response.content).strip()
             
             # Validate the LLM's correction
             final_validation = self.validator.validate_and_clean_sql(corrected_sql, readonly)

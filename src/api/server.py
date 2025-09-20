@@ -73,19 +73,19 @@ def create_app() -> Flask:
     settings = get_settings()
     
     # Configure Flask secret key for sessions
-    app.secret_key = settings.csrf_secret or secrets.token_urlsafe(32)
+    app.secret_key = settings.CSRF_SECRET or secrets.token_urlsafe(32)
     
     # Configure CORS with restricted origins and headers
     CORS(app, 
-         origins=settings.cors_origins,
-         methods=settings.cors_methods,
-         allow_headers=settings.cors_headers,
+         origins=settings.CORS_ORIGINS,
+         methods=settings.CORS_METHODS,
+         allow_headers=settings.CORS_HEADERS,
          supports_credentials=True)
     
     # Initialize CSRF protection if secret is provided
     csrf_validator = None
-    if settings.csrf_secret:
-        csrf_validator = CSRFValidator(settings.csrf_secret)
+    if settings.CSRF_SECRET:
+        csrf_validator = CSRFValidator(settings.CSRF_SECRET)
         print("CSRF protection enabled")
     else:
         print("WARNING: CSRF protection disabled - set CSRF_SECRET environment variable")
@@ -693,7 +693,7 @@ if __name__ == "__main__":
     # For development purposes only
     settings = get_settings()
     app.run(
-        host=settings.flask_host,
-        port=settings.flask_port,
-        debug=settings.flask_debug
+        host=settings.FLASK_HOST,
+        port=settings.FLASK_PORT,
+        debug=settings.FLASK_DEBUG
     )

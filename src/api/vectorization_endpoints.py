@@ -214,7 +214,7 @@ def search_vectorized_content():
             query=data['query'],
             collection_name=data.get('collection_name'),
             top_k=data.get('top_k', 5),
-            similarity_threshold=data.get('similarity_threshold', 0.7)
+            SIMILARITY_THRESHOLD=data.get('SIMILARITY_THRESHOLD', 0.7)
         )
         
         return jsonify({
