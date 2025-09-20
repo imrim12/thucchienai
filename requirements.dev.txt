@@ -1,0 +1,6 @@
+# Inherit production dependencies
+-r requirements.txt
+
+# Development-specific dependencies
+ruff==0.13.1
+pytest==8.4.2
