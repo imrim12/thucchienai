@@ -45,7 +45,16 @@ Please adhere strictly to this directory structure. It is designed for clarity, 
     |
     ├── database/
     |   ├── __init__.py
-    |   └── postgres_cache.py   # Manages connection and CRUD for the PostgreSQL cache.
+    |   ├── chroma_db.py        # Manages ChromaDB for vector similarity caching
+    |   ├── database.py         # SQLAlchemy session management
+    |   └── models/             # Database models for vectorization system
+    |       ├── __init__.py
+    |       ├── base.py
+    |       ├── enums.py
+    |       ├── database_connection.py
+    |       ├── table_config.py
+    |       ├── column_config.py
+    |       └── vectorization_job.py
     |
     ├── services/
     |   ├── __init__.py
@@ -58,25 +67,23 @@ Please adhere strictly to this directory structure. It is designed for clarity, 
 Key Implementation Details
 src/core/config.py:
 
-Create a Settings class using Pydantic or a simple class to load GOOGLE_API_KEY and POSTGRES_URI from the .env file.
+Create a Settings class using Pydantic or a simple class to load GOOGLE_API_KEY and database connection settings from the .env file.
 
-src/database/postgres_cache.py:
+src/database/chroma_db.py:
 
-Define a class PostgresCache.
+Define a class ChromaCache.
 
-Implement a method connect() to establish the database connection.
-
-Implement create_cache_table() to create a table named query_cache if it doesn't exist. This table must have the following columns:
-
-id (Primary Key, SERIAL)
-
-natural_question (TEXT, NOT NULL)
-
-sql_query (TEXT, NOT NULL)
-
-question_vector (BYTEA or another suitable type for storing the embedding vector)
+Implement a method connect() to establish the ChromaDB connection.
 
 Implement methods like add_to_cache(question, sql, vector) and find_similar_question(vector, threshold).
+
+src/database/models/:
+
+SQLAlchemy models for managing database vectorization configurations:
+- DatabaseConnection: Store external database connections
+- TableConfig: Configure table vectorization settings  
+- ColumnConfig: Detailed column configurations
+- VectorizationJob: Track processing jobs and status
 
 src/llm/gemini_provider.py:
 
@@ -86,17 +93,17 @@ src/services/text_to_sql_service.py:
 
 This is the main logic hub. Create a TextToSQLService class.
 
-In its __init__, it should initialize the LLM, embedding model, and the PostgresCache.
+In its __init__, it should initialize the LLM, embedding model, and the ChromaCache.
 
 Implement the primary method: def process_question(natural_question: str).
 
 The logic for process_question must be:
 a.  Generate an embedding for the natural_question.
-b.  Query the PostgresCache to find if a similar question vector exists above a certain similarity threshold.
+b.  Query the ChromaCache to find if a similar question vector exists above a certain similarity threshold.
 c.  If a similar question is found in the cache: Return the cached SQL query.
 d.  If not found:
 i.  Use LangChain's SQL Chain (create_sql_query_chain) with the Gemini LLM to generate the SQL query from the natural_question.
-ii. Store the new natural_question, the generated sql_query, and its question_vector into the PostgreSQL cache.
+ii. Store the new natural_question, the generated sql_query, and its question_vector into the ChromaDB cache.
 iii. Return the newly generated SQL query.
 
 src/api/server.py:

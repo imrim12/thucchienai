@@ -4,11 +4,16 @@ ChromaDB implementation for caching text-to-SQL queries with vector similarity s
 
 import os
 import uuid
+import logging
 import numpy as np
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Dict, Any, cast
 import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
+from chromadb.api.models.Collection import Collection
+from chromadb.api import ClientAPI
+
+logger = logging.getLogger(__name__)
 
 
 class ChromaCache:
@@ -29,7 +34,7 @@ class ChromaCache:
         os.makedirs(persist_directory, exist_ok=True)
         
         # Initialize ChromaDB client with persistence
-        self.client = chromadb.PersistentClient(
+        self.client: Optional[ClientAPI] = chromadb.PersistentClient(
             path=persist_directory,
             settings=Settings(
                 anonymized_telemetry=False,
@@ -39,7 +44,7 @@ class ChromaCache:
         
         # Get or create collection
         try:
-            self.collection = self.client.get_collection(name=collection_name)
+            self.collection: Optional[Collection] = self.client.get_collection(name=collection_name)
             print(f"Loaded existing ChromaDB collection: {collection_name}")
         except Exception:
             # Collection doesn't exist, create it
@@ -51,7 +56,7 @@ class ChromaCache:
         
         print(f"ChromaDB cache initialized with {self.get_cache_size()} cached queries")
     
-    def add_to_cache(self, natural_question: str, sql_query: str, question_vector: np.ndarray) -> str:
+    def add_to_cache(self, natural_question: str, sql_query: str, question_vector: np.ndarray) -> Optional[str]:
         """
         Add a new question-SQL pair to the cache.
         
@@ -69,6 +74,11 @@ class ChromaCache:
             
             # Convert numpy array to list for ChromaDB
             embedding = question_vector.tolist() if isinstance(question_vector, np.ndarray) else question_vector
+            
+            # Check if collection is initialized
+            if not self.collection:
+                logger.error("ChromaDB collection not initialized")
+                return None
             
             # Add to collection
             self.collection.add(
@@ -104,6 +114,9 @@ class ChromaCache:
             embedding = question_vector.tolist() if isinstance(question_vector, np.ndarray) else question_vector
             
             # Query for the most similar document
+            if not self.collection:
+                return None
+                
             results = self.collection.query(
                 query_embeddings=[embedding],
                 n_results=1,
@@ -111,21 +124,23 @@ class ChromaCache:
             )
             
             # Check if we have results and if similarity meets threshold
-            if results["documents"] and len(results["documents"][0]) > 0:
+            if (results and results.get("documents") and results.get("distances") and 
+                cast(Any, results["documents"]) and cast(Any, results["distances"]) and
+                len(cast(Any, results["documents"])[0]) > 0):
                 # ChromaDB returns distances (lower is more similar)
                 # Convert distance to similarity score (1 - normalized_distance)
-                distance = results["distances"][0][0]
+                distance = cast(Any, results["distances"])[0][0]
                 
                 # Normalize distance to similarity score (this is an approximation)
                 # For cosine distance, similarity = 1 - distance
                 similarity_score = 1 - distance
                 
                 if similarity_score >= threshold:
-                    original_question = results["documents"][0][0]
-                    sql_query = results["metadatas"][0][0]["sql_query"]
+                    original_question = str(cast(Any, results["documents"])[0][0])
+                    sql_query = str(cast(Any, results["metadatas"])[0][0]["sql_query"])
                     
                     print(f"Found similar question with similarity: {similarity_score:.3f}")
-                    return original_question, sql_query, similarity_score
+                    return original_question, sql_query, float(similarity_score)
                 else:
                     print(f"Best match similarity {similarity_score:.3f} below threshold {threshold}")
                     
@@ -143,6 +158,8 @@ class ChromaCache:
             Dictionary with cache statistics
         """
         try:
+            if not self.collection:
+                return {}
             cache_size = self.collection.count()
             
             return {
@@ -168,6 +185,8 @@ class ChromaCache:
             Number of cached queries
         """
         try:
+            if not self.collection:
+                return 0
             return self.collection.count()
         except Exception as e:
             print(f"Error getting cache size: {e}")
@@ -182,10 +201,12 @@ class ChromaCache:
         """
         try:
             # Delete the collection and recreate it
-            self.client.delete_collection(name=self.collection_name)
+            if self.client:
+                self.client.delete_collection(name=self.collection_name)
             
             # Recreate the collection
-            self.collection = self.client.create_collection(
+            if self.client:
+                self.collection = self.client.create_collection(
                 name=self.collection_name,
                 metadata={"description": "Text-to-SQL query cache with vector similarity search"}
             )
@@ -209,13 +230,16 @@ class ChromaCache:
         """
         try:
             # Get all documents from the collection
+            if not self.collection:
+                return []
             results = self.collection.get(
                 include=["documents", "metadatas"],
                 limit=limit
             )
             
             queries = []
-            if results["documents"]:
+            if (results and results.get("documents") and results.get("metadatas") and 
+                results["documents"] and results["metadatas"]):
                 for i, doc in enumerate(results["documents"]):
                     queries.append({
                         "question": doc,
@@ -240,7 +264,8 @@ class ChromaCache:
             True if successful, False otherwise
         """
         try:
-            self.collection.delete(ids=[query_id])
+            if self.collection:
+                self.collection.delete(ids=[query_id])
             print(f"Removed query with ID: {query_id}")
             return True
             
@@ -254,8 +279,8 @@ class ChromaCache:
         """
         try:
             # ChromaDB client doesn't need explicit closing, but we can set references to None
-            self.collection = None
-            self.client = None
+            self.collection: Optional[Collection] = None
+            self.client: Optional[ClientAPI] = None
             print("ChromaDB cache connection closed")
             
         except Exception as e:

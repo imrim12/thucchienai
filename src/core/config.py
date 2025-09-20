@@ -28,7 +28,14 @@ class Settings:
         
         # PostgreSQL Cache Database Configuration (for query caching)
         self.cache_db_uri = os.getenv("CACHE_DB_URI")
-        
+
+        # SQLAlchemy Configuration
+        self.sqlalchemy_database_url = os.getenv(
+            "SQLALCHEMY_DATABASE_URL", 
+            "postgresql://user:password@localhost:5432/text_to_sql_metadata"
+        )
+        self.sqlalchemy_echo = os.getenv("SQLALCHEMY_ECHO", "false").lower() == "true"
+
         # Target Database Configuration (for SQL execution)
         self.target_db_uri = os.getenv("TARGET_DB_URI")
         

@@ -12,8 +12,15 @@ langchain-community>=0.3.0
 # Vector Database
 chromadb>=0.5.0
 
-# Database (for target SQL database connections)
+# Database ORM and migrations
 sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.0
+
+# Database drivers for various databases
+pymysql>=1.1.0  # MySQL
+pyodbc>=4.0.0   # SQL Server
+cx-oracle>=8.3.0  # Oracle (optional)
 
 # SQL parsing and validation
 sqlparse>=0.5.0

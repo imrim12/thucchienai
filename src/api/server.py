@@ -15,6 +15,7 @@ import time
 
 from src.agents.text_to_sql import TextToSQLService
 from src.core.config import get_settings
+from src.api.vectorization_endpoints import register_vectorization_blueprint
 
 
 class CSRFValidator:
@@ -100,6 +101,9 @@ def create_app() -> Flask:
                 return False
             return csrf_validator.validate_token(csrf_token)
         return True
+    
+    # Register vectorization endpoints
+    register_vectorization_blueprint(app)
     
     # Initialize the Text-to-SQL service
     try:
