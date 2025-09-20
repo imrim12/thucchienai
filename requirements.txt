@@ -12,6 +12,9 @@ langchain-community==0.0.38
 psycopg2-binary==2.9.7
 sqlalchemy==2.0.21
 
+# SQL parsing and validation
+sqlparse==0.4.4
+
 # Vector operations
 numpy==1.24.3
 faiss-cpu==1.7.4

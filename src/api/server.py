@@ -7,7 +7,7 @@ from flask_cors import CORS
 from typing import Dict, Any
 import traceback
 
-from src.services.text_to_sql_service import TextToSQLService
+from src.agents.text_to_sql import TextToSQLService
 from src.core.config import get_settings
 
 
@@ -54,16 +54,18 @@ def create_app() -> Flask:
         
         Expected JSON payload:
         {
-            "question": "your natural language question here"
+            "question": "your natural language question here",
+            "readonly": false  // optional, defaults to false
         }
         
         Returns:
         {
-            "sql_query": "generated SQL query",
+            "sql_query": "generated SQL query" or "",
             "from_cache": boolean,
             "similarity_score": number (if from cache),
             "cached_question": string (if from cache),
-            "cache_stats": object
+            "cache_stats": object,
+            "is_valid": boolean
         }
         """
         if text_to_sql_service is None:
@@ -86,14 +88,21 @@ def create_app() -> Flask:
                 }), 400
             
             question = data['question']
+            readonly = data.get('readonly', False)  # Default to False
             
             if not question or not question.strip():
                 return jsonify({
                     "error": "Question cannot be empty"
                 }), 400
             
+            # Validate readonly parameter
+            if not isinstance(readonly, bool):
+                return jsonify({
+                    "error": "'readonly' must be a boolean"
+                }), 400
+            
             # Process the question
-            result = text_to_sql_service.process_question(question.strip())
+            result = text_to_sql_service.process_question(question.strip(), readonly)
             
             return jsonify(result), 200
             
@@ -172,7 +181,8 @@ def create_app() -> Flask:
         
         Expected JSON payload:
         {
-            "question": "your natural language question here"
+            "question": "your natural language question here",
+            "readonly": false  // optional, defaults to false
         }
         
         Returns:
@@ -181,7 +191,8 @@ def create_app() -> Flask:
             "from_cache": boolean,
             "similarity_score": number (if from cache),
             "execution_result": execution results,
-            "success": boolean
+            "success": boolean,
+            "is_valid": boolean
         }
         """
         if text_to_sql_service is None:
@@ -204,15 +215,34 @@ def create_app() -> Flask:
                 }), 400
             
             question = data['question']
+            readonly = data.get('readonly', False)  # Default to False
             
             if not question or not question.strip():
                 return jsonify({
                     "error": "Question cannot be empty"
                 }), 400
             
+            # Validate readonly parameter
+            if not isinstance(readonly, bool):
+                return jsonify({
+                    "error": "'readonly' must be a boolean"
+                }), 400
+            
             # Convert to SQL
-            sql_result = text_to_sql_service.process_question(question.strip())
+            sql_result = text_to_sql_service.process_question(question.strip(), readonly)
             sql_query = sql_result['sql_query']
+            
+            # Check if SQL is valid before execution
+            if not sql_result['is_valid'] or not sql_query:
+                return jsonify({
+                    "sql_query": sql_query,
+                    "from_cache": sql_result['from_cache'],
+                    "similarity_score": sql_result.get('similarity_score'),
+                    "cached_question": sql_result.get('cached_question'),
+                    "execution_result": {"success": False, "error": "Invalid SQL generated"},
+                    "success": False,
+                    "is_valid": False
+                }), 400
             
             # Execute SQL
             execution_result = text_to_sql_service.execute_sql(sql_query)
@@ -224,7 +254,8 @@ def create_app() -> Flask:
                 "similarity_score": sql_result.get('similarity_score'),
                 "cached_question": sql_result.get('cached_question'),
                 "execution_result": execution_result,
-                "success": execution_result['success']
+                "success": execution_result['success'],
+                "is_valid": sql_result['is_valid']
             }
             
             status_code = 200 if execution_result['success'] else 400
@@ -232,6 +263,199 @@ def create_app() -> Flask:
             
         except Exception as e:
             print(f"Error in text-to-sql-and-execute endpoint: {e}")
+            print(traceback.format_exc())
+            return jsonify({
+                "error": "Internal server error",
+                "message": str(e)
+            }), 500
+    
+    @app.route('/api/explain-sql', methods=['POST'])
+    def explain_sql():
+        """
+        Generate natural language explanation of SQL query.
+        
+        Expected JSON payload:
+        {
+            "sql_query": "SELECT * FROM users WHERE age > 25"
+        }
+        
+        Returns:
+        {
+            "explanation": "This query retrieves all columns from the users table..."
+        }
+        """
+        if text_to_sql_service is None:
+            return jsonify({
+                "error": "Service not initialized"
+            }), 503
+        
+        try:
+            # Validate request
+            if not request.is_json:
+                return jsonify({
+                    "error": "Request must be JSON"
+                }), 400
+            
+            data = request.get_json()
+            
+            if not data or 'sql_query' not in data:
+                return jsonify({
+                    "error": "Missing 'sql_query' field in request"
+                }), 400
+            
+            sql_query = data['sql_query']
+            
+            if not sql_query or not sql_query.strip():
+                return jsonify({
+                    "error": "SQL query cannot be empty"
+                }), 400
+            
+            # Generate explanation
+            explanation = text_to_sql_service.explain_sql(sql_query.strip())
+            
+            return jsonify({
+                "explanation": explanation
+            }), 200
+            
+        except Exception as e:
+            print(f"Error in explain-sql endpoint: {e}")
+            print(traceback.format_exc())
+            return jsonify({
+                "error": "Internal server error",
+                "message": str(e)
+            }), 500
+    
+    @app.route('/api/validate-sql-with-llm', methods=['POST'])
+    def validate_sql_with_llm():
+        """
+        Validate and potentially correct SQL using LLM.
+        
+        Expected JSON payload:
+        {
+            "sql_query": "SELCT * FROM users",  // potentially incorrect SQL
+            "readonly": true  // optional, defaults to false
+        }
+        
+        Returns:
+        {
+            "is_valid": boolean,
+            "corrected_sql": "corrected SQL or original if valid",
+            "explanation": "explanation of validation result"
+        }
+        """
+        if text_to_sql_service is None:
+            return jsonify({
+                "error": "Service not initialized"
+            }), 503
+        
+        try:
+            # Validate request
+            if not request.is_json:
+                return jsonify({
+                    "error": "Request must be JSON"
+                }), 400
+            
+            data = request.get_json()
+            
+            if not data or 'sql_query' not in data:
+                return jsonify({
+                    "error": "Missing 'sql_query' field in request"
+                }), 400
+            
+            sql_query = data['sql_query']
+            readonly = data.get('readonly', False)
+            
+            if not sql_query or not sql_query.strip():
+                return jsonify({
+                    "error": "SQL query cannot be empty"
+                }), 400
+            
+            # Validate readonly parameter
+            if not isinstance(readonly, bool):
+                return jsonify({
+                    "error": "'readonly' must be a boolean"
+                }), 400
+            
+            # Perform LLM validation
+            result = text_to_sql_service.validate_sql_with_llm(sql_query.strip(), readonly)
+            
+            return jsonify(result), 200
+            
+        except Exception as e:
+            print(f"Error in validate-sql-with-llm endpoint: {e}")
+            print(traceback.format_exc())
+            return jsonify({
+                "error": "Internal server error",
+                "message": str(e)
+            }), 500
+    
+    @app.route('/api/validate-sql', methods=['POST'])
+    def validate_sql():
+        """
+        Validate SQL query syntax and readonly constraints.
+        
+        Expected JSON payload:
+        {
+            "sql_query": "SELECT * FROM users",
+            "readonly": true  // optional, defaults to false
+        }
+        
+        Returns:
+        {
+            "is_valid": boolean,
+            "cleaned_sql": "cleaned SQL or empty string",
+            "is_select_only": boolean,
+            "passed_readonly_check": boolean
+        }
+        """
+        if text_to_sql_service is None:
+            return jsonify({
+                "error": "Service not initialized"
+            }), 503
+        
+        try:
+            # Validate request
+            if not request.is_json:
+                return jsonify({
+                    "error": "Request must be JSON"
+                }), 400
+            
+            data = request.get_json()
+            
+            if not data or 'sql_query' not in data:
+                return jsonify({
+                    "error": "Missing 'sql_query' field in request"
+                }), 400
+            
+            sql_query = data['sql_query']
+            readonly = data.get('readonly', False)
+            
+            if not sql_query or not sql_query.strip():
+                return jsonify({
+                    "error": "SQL query cannot be empty"
+                }), 400
+            
+            # Validate readonly parameter
+            if not isinstance(readonly, bool):
+                return jsonify({
+                    "error": "'readonly' must be a boolean"
+                }), 400
+            
+            # Perform validation
+            cleaned_sql = text_to_sql_service.validator.validate_and_clean_sql(sql_query, readonly)
+            is_valid = bool(cleaned_sql)
+            is_select_only = text_to_sql_service.validator.is_select_only(sql_query)
+            passed_readonly_check = not readonly or is_select_only
+            
+            return jsonify({
+                "is_valid": is_valid,
+                "cleaned_sql": cleaned_sql,
+                "is_select_only": is_select_only,
+                "passed_readonly_check": passed_readonly_check
+            }), 200
+            
+        except Exception as e:
+            print(f"Error in validate-sql endpoint: {e}")
             print(traceback.format_exc())
             return jsonify({
                 "error": "Internal server error",
