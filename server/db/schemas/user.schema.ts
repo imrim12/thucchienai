@@ -3,8 +3,7 @@ import { relations } from 'drizzle-orm/relations'
 import { identitySchema } from './identity.schema'
 
 export const userSchema = pgTable('users', {
-  id: text('id')
-    .primaryKey(),
+  id: text('id').primaryKey(),
   name: text('name'),
   email: text('email').notNull().unique(),
   emailVerified: timestamp('email_verified', { mode: 'date' }),
