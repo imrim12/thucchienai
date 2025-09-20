@@ -16,6 +16,28 @@ from src.agents.text_to_sql import TextToSQLService
 from src.api.vectorization_endpoints import register_vectorization_blueprint
 from src.core.config import get_settings
 
+# Import Swagger models - will be available after installing flask-restx
+swagger_api = None
+text_to_sql_request = text_to_sql_response = None
+execute_sql_request = execute_sql_response = None
+health_response = csrf_token_response = error_response = None
+
+try:
+    from src.api.swagger_models import api as swagger_api
+    from src.api.swagger_models import (
+        csrf_token_response,
+        execute_sql_request,
+        execute_sql_response,
+        health_response,
+        text_to_sql_request,
+        text_to_sql_response,
+    )
+
+    SWAGGER_ENABLED = True
+except ImportError:
+    SWAGGER_ENABLED = False
+    print("Flask-RESTX not available. Swagger documentation disabled.")
+
 
 class CSRFValidator:
     """Custom CSRF token validator."""
@@ -72,6 +94,15 @@ def create_app() -> Flask:
     # Configure Flask secret key for sessions
     app.secret_key = settings.CSRF_SECRET or secrets.token_urlsafe(32)
 
+    # Initialize Swagger documentation if available
+    if SWAGGER_ENABLED and swagger_api:
+        try:
+            swagger_api.init_app(app)
+            print("Swagger documentation enabled at /docs/")
+        except Exception as e:
+            print(f"Failed to initialize Swagger: {e}")
+            print("Continuing without Swagger documentation")
+
     # Configure CORS with restricted origins and headers
     CORS(
         app,
@@ -116,7 +147,35 @@ def create_app() -> Flask:
         print(f"Failed to initialize Text-to-SQL service: {e}")
         text_to_sql_service = None
 
-    @app.route("/api/csrf-token", methods=["GET"])
+    # Helper function to conditionally apply Swagger decorators
+    def swagger_route(
+        path, methods, doc_string=None, expect_model=None, response_model=None
+    ):
+        """Decorator factory that applies Flask route and optional Swagger decorators."""
+
+        def decorator(func):
+            # Apply Flask route decorator first
+            route_func = app.route(path, methods=methods)(func)
+
+            # Apply Swagger decorators if available
+            if SWAGGER_ENABLED and swagger_api:
+                if doc_string:
+                    route_func = swagger_api.doc(doc_string)(route_func)
+                if expect_model:
+                    route_func = swagger_api.expect(expect_model)(route_func)
+                if response_model:
+                    route_func = swagger_api.marshal_with(response_model)(route_func)
+
+            return route_func
+
+        return decorator
+
+    @swagger_route(
+        "/api/csrf-token",
+        ["GET"],
+        doc_string="Get CSRF Token",
+        response_model=csrf_token_response,
+    )
     def get_csrf_token():
         """Get CSRF token for client-side requests."""
         if not csrf_validator:
@@ -125,7 +184,9 @@ def create_app() -> Flask:
         token = csrf_validator.generate_token()
         return jsonify({"csrf_token": token}), 200
 
-    @app.route("/health", methods=["GET"])
+    @swagger_route(
+        "/health", ["GET"], doc_string="Health Check", response_model=health_response
+    )
     def health_check():
         """Health check endpoint."""
         if text_to_sql_service is None:
@@ -145,7 +206,13 @@ def create_app() -> Flask:
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
 
-    @app.route("/api/text-to-sql", methods=["POST"])
+    @swagger_route(
+        "/api/text-to-sql",
+        ["POST"],
+        doc_string="Convert Text to SQL",
+        expect_model=text_to_sql_request,
+        response_model=text_to_sql_response,
+    )
     def text_to_sql():
         """
         Convert natural language question to SQL query.
@@ -206,7 +273,13 @@ def create_app() -> Flask:
             print(traceback.format_exc())
             return jsonify({"error": "Internal server error", "message": str(e)}), 500
 
-    @app.route("/api/execute-sql", methods=["POST"])
+    @swagger_route(
+        "/api/execute-sql",
+        ["POST"],
+        doc_string="Execute SQL Query",
+        expect_model=execute_sql_request,
+        response_model=execute_sql_response,
+    )
     def execute_sql():
         """
         Execute SQL query against the target database.

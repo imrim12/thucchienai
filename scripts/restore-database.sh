@@ -30,7 +30,10 @@ if [ -n "$METADATA_DATABASE_URL" ]; then
     echo "Creating metadata database: $METADATA_DB_NAME"
     
     # Create the metadata database if it doesn't exist
-    psql -h postgres -U postgres -d postgres -c "SELECT 'CREATE DATABASE $METADATA_DB_NAME' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$METADATA_DB_NAME')\gexec" || true
+    psql -h postgres -U postgres -d postgres << EOF
+SELECT 'CREATE DATABASE $METADATA_DB_NAME' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$METADATA_DB_NAME')
+\gexec
+EOF
 fi
 
 # Check if backup file exists

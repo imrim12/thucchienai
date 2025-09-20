@@ -2,5 +2,6 @@
 -r requirements.txt
 
 # Development-specific dependencies
+flask-restx>=1.3.0  # Swagger/OpenAPI documentation support
 ruff==0.13.1
 pytest==8.4.2

@@ -1,27 +1,27 @@
 services:
   # Text-to-SQL API Service
-  # text-to-sql-api:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: text-to-sql-api
-  #   ports:
-  #     - "5000:5000"
-  #   volumes:
-  #     # Mount source code for development with hot-reloading.
-  #     - .:/app
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     - postgres
-  #     - chromadb
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 40s
+  text-to-sql-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: text-to-sql-api
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source code for development with hot-reloading.
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - chromadb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # ChromaDB Vector Database
   chromadb:
@@ -38,6 +38,23 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  # ChromaDB Admin UI (Optional)
+  # To run this service, use: docker-compose --profile chromadb-admin up
+  chromadb-admin:
+    image: fengzhichao/chromadb-admin:latest
+    container_name: text-to-sql-chromadb-admin
+    environment:
+      - CHROMA_SERVER_HOST=chromadb
+      - CHROMA_SERVER_HTTP_PORT=8000
+    ports:
+      - "8081:80"
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - chromadb-admin
 
   # PostgreSQL Database
   postgres:
@@ -91,3 +108,5 @@ services:
     depends_on:
       - postgres
     restart: unless-stopped
+    profiles:
+      - pgadmin

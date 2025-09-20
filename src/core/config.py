@@ -10,6 +10,8 @@ Database Architecture:
 
 import os
 
+from pydantic import SecretStr
+
 
 class Settings:
     """Application settings loaded from environment variables."""
@@ -22,9 +24,8 @@ class Settings:
             load_dotenv()
 
         # Google AI API Configuration - support both old and new names
-        self.GOOGLE_API_KEY = (
-            os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY") or ""
-        )
+        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY") or ""
+        self.GOOGLE_API_KEY = SecretStr(api_key)
 
         # ChromaDB Configuration
         self.CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
